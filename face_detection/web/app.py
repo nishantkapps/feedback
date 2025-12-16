@@ -1,6 +1,7 @@
 """
 Web Dashboard for Face Pain Detection
 Displays real-time pain analysis with video feed and recommendations.
+Includes IRDS integration for gesture control feedback.
 """
 
 import sys
@@ -22,17 +23,30 @@ import numpy as np
 from face_detection.pain_detector import PainDetector, PainReading
 from face_detection.video_source import VideoSource
 
+# Import IRDS integration
+try:
+    from integration.irds_interface import GestureModifier, PainFeedback
+    IRDS_AVAILABLE = True
+except ImportError:
+    IRDS_AVAILABLE = False
+    print("Warning: IRDS integration not available")
+
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # Global state
 detector: PainDetector = None
 video_source: VideoSource = None
 current_reading: dict = None
+current_irds_feedback: dict = None
 is_running = False
 is_calibrated = False
 history = []
 lock = threading.Lock()
 shutdown_event = threading.Event()
+
+# IRDS integration
+gesture_modifier = GestureModifier() if IRDS_AVAILABLE else None
+irds_output_file = Path(__file__).parent.parent.parent / "data" / "irds_feedback.json"
 
 
 def cleanup():
@@ -86,10 +100,74 @@ def init_detector():
 
 
 def get_reading_dict(reading: PainReading) -> dict:
-    """Convert reading to dictionary with description."""
+    """Convert reading to dictionary with description and IRDS modifiers."""
     data = reading.to_dict()
     data['description'] = detector.get_level_description(reading.level, reading.pain_score)
+    
+    # Calculate IRDS modifiers
+    if IRDS_AVAILABLE and gesture_modifier:
+        irds = calculate_irds_feedback(reading)
+        data['irds'] = irds
+        
+        # Save to file
+        save_irds_feedback(irds)
+    
     return data
+
+
+def calculate_irds_feedback(reading: PainReading) -> dict:
+    """Calculate IRDS gesture modifiers from pain reading."""
+    # Map face detection levels to pain levels
+    level_map = {
+        'NONE': 0,
+        'MILD': 1,
+        'MODERATE': 2,
+        'SEVERE': 3,
+        'EXTREME': 4
+    }
+    
+    pain_level = level_map.get(reading.level, 0)
+    
+    feedback = gesture_modifier.create_feedback(
+        pain_level=pain_level,
+        pain_level_name=reading.level,
+        pain_score=reading.pain_score,
+        source='face',
+        confidence=0.9 if reading.face_detected else 0.0,
+        details={
+            'brow_furrow': reading.brow_furrow,
+            'eye_squeeze': reading.eye_squeeze,
+            'nose_wrinkle': reading.nose_wrinkle,
+            'lip_raise': reading.lip_raise,
+            'face_detected': reading.face_detected
+        }
+    )
+    
+    return {
+        'pain_level': feedback.pain_level,
+        'pain_level_name': feedback.pain_level_name,
+        'pain_score': feedback.pain_score,
+        'speed_modifier': feedback.speed_modifier,
+        'amplitude_modifier': feedback.amplitude_modifier,
+        'force_modifier': feedback.force_modifier,
+        'should_pause': feedback.should_pause,
+        'should_stop': feedback.should_stop,
+        'confidence': feedback.confidence,
+        'timestamp': feedback.timestamp
+    }
+
+
+def save_irds_feedback(irds: dict):
+    """Save IRDS feedback to file."""
+    global current_irds_feedback
+    
+    try:
+        irds_output_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(irds_output_file, 'w') as f:
+            json.dump(irds, f, indent=2)
+        current_irds_feedback = irds
+    except Exception as e:
+        print(f"Error saving IRDS feedback: {e}")
 
 
 def process_frame(frame: np.ndarray, calibrate: bool = False) -> tuple:
@@ -332,6 +410,27 @@ def get_status():
         'source_type': 'camera' if (video_source and video_source.is_camera) else 'file',
         'frame_count': video_source.current_frame if video_source else 0,
         'progress': video_source.progress if video_source else 0
+    })
+
+
+@app.route('/api/irds')
+def get_irds_feedback():
+    """Get current IRDS gesture modifiers."""
+    with lock:
+        if current_irds_feedback:
+            return jsonify(current_irds_feedback)
+    
+    # Return default values
+    return jsonify({
+        'pain_level': 0,
+        'pain_level_name': 'NONE',
+        'pain_score': 0,
+        'speed_modifier': 1.0,
+        'amplitude_modifier': 1.0,
+        'force_modifier': 1.0,
+        'should_pause': False,
+        'should_stop': False,
+        'confidence': 0
     })
 
 

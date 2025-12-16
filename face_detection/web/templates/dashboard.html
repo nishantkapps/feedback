@@ -495,6 +495,116 @@
         .alert-pulse {
             animation: alertPulse 0.5s ease-in-out infinite;
         }
+
+        /* IRDS Feedback Styles */
+        .irds-display {
+            padding: 0.5rem;
+        }
+
+        .irds-status-row {
+            margin-bottom: 1rem;
+        }
+
+        .irds-status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: rgba(63, 185, 80, 0.15);
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-green);
+            transition: all 0.3s ease;
+        }
+
+        .irds-status-item.warning {
+            background: rgba(219, 109, 40, 0.15);
+            border-left-color: var(--accent-orange);
+        }
+
+        .irds-status-item.danger {
+            background: rgba(248, 81, 73, 0.15);
+            border-left-color: var(--accent-red);
+        }
+
+        .irds-status-icon {
+            font-size: 1.25rem;
+        }
+
+        .irds-status-text {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .irds-modifiers {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .irds-modifier {
+            display: grid;
+            grid-template-columns: 80px 1fr 50px;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .irds-modifier-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .irds-modifier-bar {
+            height: 10px;
+            background: var(--bg-secondary);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .irds-modifier-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+            border-radius: 5px;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        .irds-modifier-fill.warning {
+            background: linear-gradient(90deg, var(--accent-orange), var(--accent-yellow));
+        }
+
+        .irds-modifier-fill.danger {
+            background: linear-gradient(90deg, var(--accent-red), var(--accent-orange));
+        }
+
+        .irds-modifier-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: right;
+            color: var(--text-primary);
+        }
+
+        .irds-confidence {
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .irds-confidence-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .irds-confidence-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-blue);
+        }
     </style>
 </head>
 <body>
@@ -636,6 +746,53 @@
                                 <div class="arm-label">Robotic Arm Status</div>
                                 <div class="arm-speed" id="armSpeed">Full Speed (100%)</div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IRDS Gesture Feedback -->
+                <div class="card" id="irdsCard">
+                    <div class="card-title">
+                        IRDS Gesture Modifiers
+                        <span style="margin-left: auto; font-size: 0.7rem; color: var(--text-muted);">
+                            📁 data/irds_feedback.json
+                        </span>
+                    </div>
+                    <div class="irds-display">
+                        <div class="irds-status-row">
+                            <div class="irds-status-item" id="irdsStatusItem">
+                                <span class="irds-status-icon" id="irdsStatusIcon">✓</span>
+                                <span class="irds-status-text" id="irdsStatusText">Normal Operation</span>
+                            </div>
+                        </div>
+                        
+                        <div class="irds-modifiers">
+                            <div class="irds-modifier">
+                                <div class="irds-modifier-label">Speed</div>
+                                <div class="irds-modifier-bar">
+                                    <div class="irds-modifier-fill" id="irdsSpeedFill" style="width: 100%"></div>
+                                </div>
+                                <div class="irds-modifier-value" id="irdsSpeedValue">100%</div>
+                            </div>
+                            <div class="irds-modifier">
+                                <div class="irds-modifier-label">Amplitude</div>
+                                <div class="irds-modifier-bar">
+                                    <div class="irds-modifier-fill" id="irdsAmpFill" style="width: 100%"></div>
+                                </div>
+                                <div class="irds-modifier-value" id="irdsAmpValue">100%</div>
+                            </div>
+                            <div class="irds-modifier">
+                                <div class="irds-modifier-label">Force</div>
+                                <div class="irds-modifier-bar">
+                                    <div class="irds-modifier-fill" id="irdsForceFill" style="width: 100%"></div>
+                                </div>
+                                <div class="irds-modifier-value" id="irdsForceValue">100%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="irds-confidence">
+                            <span class="irds-confidence-label">Confidence:</span>
+                            <span class="irds-confidence-value" id="irdsConfidence">0%</span>
                         </div>
                     </div>
                 </div>
@@ -815,6 +972,7 @@
             if (!reading.face_detected) {
                 document.getElementById('painEmoji').textContent = '❓';
                 document.getElementById('statusTitle').textContent = 'No Face Detected';
+                updateIRDSDisplay(null);
                 return;
             }
 
@@ -859,8 +1017,87 @@
                 statusCard.classList.remove('alert-pulse');
             }
 
+            // Update IRDS feedback display
+            if (reading.irds) {
+                updateIRDSDisplay(reading.irds);
+            }
+
             // Update chart
             updateChart(reading.pain_score);
+        }
+
+        function updateIRDSDisplay(irds) {
+            if (!irds) {
+                // Reset to defaults
+                irds = {
+                    speed_modifier: 1.0,
+                    amplitude_modifier: 1.0,
+                    force_modifier: 1.0,
+                    should_pause: false,
+                    should_stop: false,
+                    confidence: 0
+                };
+            }
+
+            const speedPct = Math.round(irds.speed_modifier * 100);
+            const ampPct = Math.round(irds.amplitude_modifier * 100);
+            const forcePct = Math.round(irds.force_modifier * 100);
+            const confPct = Math.round(irds.confidence * 100);
+
+            // Update modifier bars
+            document.getElementById('irdsSpeedFill').style.width = `${speedPct}%`;
+            document.getElementById('irdsSpeedValue').textContent = `${speedPct}%`;
+            
+            document.getElementById('irdsAmpFill').style.width = `${ampPct}%`;
+            document.getElementById('irdsAmpValue').textContent = `${ampPct}%`;
+            
+            document.getElementById('irdsForceFill').style.width = `${forcePct}%`;
+            document.getElementById('irdsForceValue').textContent = `${forcePct}%`;
+
+            // Update confidence
+            document.getElementById('irdsConfidence').textContent = `${confPct}%`;
+
+            // Update status
+            const statusItem = document.getElementById('irdsStatusItem');
+            const statusIcon = document.getElementById('irdsStatusIcon');
+            const statusText = document.getElementById('irdsStatusText');
+            const speedFill = document.getElementById('irdsSpeedFill');
+            const ampFill = document.getElementById('irdsAmpFill');
+            const forceFill = document.getElementById('irdsForceFill');
+
+            // Remove existing classes
+            statusItem.classList.remove('warning', 'danger');
+            speedFill.classList.remove('warning', 'danger');
+            ampFill.classList.remove('warning', 'danger');
+            forceFill.classList.remove('warning', 'danger');
+
+            if (irds.should_stop) {
+                statusItem.classList.add('danger');
+                statusIcon.textContent = '🛑';
+                statusText.textContent = 'EMERGENCY STOP';
+                speedFill.classList.add('danger');
+                ampFill.classList.add('danger');
+                forceFill.classList.add('danger');
+            } else if (irds.should_pause) {
+                statusItem.classList.add('warning');
+                statusIcon.textContent = '⏸️';
+                statusText.textContent = 'Gesture Paused';
+                speedFill.classList.add('warning');
+                ampFill.classList.add('warning');
+                forceFill.classList.add('warning');
+            } else if (speedPct < 80) {
+                statusItem.classList.add('warning');
+                statusIcon.textContent = '⚠️';
+                statusText.textContent = 'Reduced Speed';
+                if (speedPct < 50) {
+                    speedFill.classList.add('warning');
+                    ampFill.classList.add('warning');
+                    forceFill.classList.add('warning');
+                }
+            } else {
+                statusIcon.textContent = '✓';
+                statusText.textContent = 'Normal Operation';
+            }
         }
 
         function updateFeatureBar(name, value) {
