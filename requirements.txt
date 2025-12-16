@@ -6,8 +6,11 @@ pyserial>=3.5
 # Web dashboard
 flask>=3.0.0
 
-# Future dependencies (commented out for now):
-# opencv-python>=4.8.0  # Camera feedback for facial detection
-# numpy>=1.24.0         # Numerical operations
-# mediapipe>=0.10.0     # Facial landmark detection
+# Computer vision & face detection
+opencv-python>=4.8.0
+opencv-contrib-python>=4.8.0
+numpy>=1.24.0
+
+# YouTube video support
+yt-dlp>=2024.0.0
 

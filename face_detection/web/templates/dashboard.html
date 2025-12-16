@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Pain Detection - Robotic Arm Feedback</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-orange: #db6d28;
+            --accent-red: #f85149;
+            --accent-pink: #db61a2;
+            --border-color: #30363d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(ellipse at top left, rgba(88, 166, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(219, 97, 162, 0.08) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(88, 166, 255, 0.3);
+        }
+
+        .card-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+        }
+
+        /* Video Feed */
+        .video-container {
+            position: relative;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        .video-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .video-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+        }
+
+        .video-placeholder-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Pain Meter */
+        .pain-meter {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1.5rem;
+        }
+
+        .pain-circle {
+            position: relative;
+            width: 180px;
+            height: 180px;
+        }
+
+        .pain-circle-bg {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                var(--accent-green) 0deg 72deg,
+                var(--accent-yellow) 72deg 144deg,
+                var(--accent-orange) 144deg 216deg,
+                var(--accent-red) 216deg 288deg,
+                var(--accent-pink) 288deg 360deg
+            );
+            mask: radial-gradient(transparent 60%, black 61%);
+            -webkit-mask: radial-gradient(transparent 60%, black 61%);
+        }
+
+        .pain-circle-value {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pain-emoji {
+            font-size: 3rem;
+            margin-bottom: 0.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .pain-score {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .pain-level {
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        /* Feature Bars */
+        .feature-bars {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .feature-bar {
+            display: grid;
+            grid-template-columns: 100px 1fr 40px;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .feature-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .feature-track {
+            height: 6px;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .feature-fill {
+            height: 100%;
+            background: var(--accent-blue);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        .feature-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        /* Status & Recommendations */
+        .status-display {
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .status-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .status-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .recommendation-box {
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(88, 166, 255, 0.1);
+            border-left: 3px solid var(--accent-blue);
+            text-align: left;
+            transition: all 0.3s ease;
+        }
+
+        .recommendation-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-blue);
+            margin-bottom: 0.5rem;
+        }
+
+        .recommendation-text {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        /* Arm Status */
+        .arm-status-box {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .arm-icon {
+            font-size: 2rem;
+        }
+
+        .arm-info {
+            flex: 1;
+        }
+
+        .arm-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .arm-speed {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .btn {
+            font-family: 'Outfit', sans-serif;
+            padding: 0.6rem 1.25rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            border-color: var(--accent-blue);
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Chart */
+        .chart-container {
+            height: 120px;
+            margin-top: 1rem;
+        }
+
+        .chart-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-line {
+            fill: none;
+            stroke: var(--accent-blue);
+            stroke-width: 2;
+        }
+
+        .chart-area {
+            fill: url(#painGradient);
+            opacity: 0.3;
+        }
+
+        /* Status indicator */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-dot.active {
+            background: var(--accent-green);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.calibrated {
+            background: var(--accent-blue);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Source selector */
+        .source-selector {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .source-option {
+            flex: 1;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .source-option:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .source-option.active {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .source-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .source-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .file-input-container {
+            margin-top: 0.75rem;
+            display: none;
+        }
+
+        .file-input-container.visible {
+            display: block;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        /* Side panel layout */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        /* Alert animation */
+        @keyframes alertPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .alert-pulse {
+            animation: alertPulse 0.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>😊 Face Pain Detection</h1>
+            <p class="subtitle">Robotic Arm Feedback System - Facial Expression Analysis</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Video Feed Section -->
+            <div class="card">
+                <div class="card-title">
+                    Video Feed
+                    <span style="margin-left: auto;" class="status-indicator">
+                        <span class="status-dot" id="statusDot"></span>
+                        <span id="statusText">Idle</span>
+                    </span>
+                </div>
+                
+                <div class="video-container">
+                    <img class="video-feed" id="videoFeed" style="display: none;">
+                    <div class="video-placeholder" id="videoPlaceholder">
+                        <div class="video-placeholder-icon">📷</div>
+                        <p>Select source and click Start</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <div class="source-selector">
+                        <div class="source-option active" id="cameraOption" onclick="selectSource('camera')">
+                            <div class="source-icon">🎥</div>
+                            <div class="source-label">Webcam</div>
+                        </div>
+                        <div class="source-option" id="fileOption" onclick="selectSource('file')">
+                            <div class="source-icon">📁</div>
+                            <div class="source-label">Video File</div>
+                        </div>
+                        <div class="source-option" id="youtubeOption" onclick="selectSource('youtube')">
+                            <div class="source-icon">📺</div>
+                            <div class="source-label">YouTube</div>
+                        </div>
+                    </div>
+                    
+                    <div class="file-input-container" id="fileInputContainer">
+                        <input type="text" class="file-input" id="filePathInput" 
+                               placeholder="Enter video file path...">
+                    </div>
+                    
+                    <div class="file-input-container" id="youtubeInputContainer">
+                        <input type="text" class="file-input" id="youtubeUrlInput" 
+                               placeholder="Paste YouTube URL (e.g., https://www.youtube.com/watch?v=...)">
+                        <div id="youtubeInfo" style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);"></div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-primary" id="startBtn" onclick="startAnalysis()">
+                        ▶ Start Analysis
+                    </button>
+                    <button class="btn btn-secondary" id="calibrateBtn" onclick="calibrate()" disabled>
+                        🎯 Calibrate
+                    </button>
+                    <button class="btn btn-danger" id="stopBtn" onclick="stopAnalysis()" disabled>
+                        ⏹ Stop
+                    </button>
+                </div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="side-panel">
+                <!-- Pain Meter -->
+                <div class="card">
+                    <div class="card-title">Pain Level</div>
+                    <div class="pain-meter">
+                        <div class="pain-circle">
+                            <div class="pain-circle-bg"></div>
+                            <div class="pain-circle-value">
+                                <div class="pain-emoji" id="painEmoji">😊</div>
+                                <div class="pain-score" id="painScore">0%</div>
+                            </div>
+                        </div>
+                        <div class="pain-level" id="painLevel" style="background: rgba(63, 185, 80, 0.2); color: #3fb950;">
+                            NONE
+                        </div>
+                    </div>
+
+                    <div class="feature-bars">
+                        <div class="feature-bar">
+                            <span class="feature-label">Brow Furrow</span>
+                            <div class="feature-track">
+                                <div class="feature-fill" id="browFill"></div>
+                            </div>
+                            <span class="feature-value" id="browValue">0%</span>
+                        </div>
+                        <div class="feature-bar">
+                            <span class="feature-label">Eye Squeeze</span>
+                            <div class="feature-track">
+                                <div class="feature-fill" id="eyeFill"></div>
+                            </div>
+                            <span class="feature-value" id="eyeValue">0%</span>
+                        </div>
+                        <div class="feature-bar">
+                            <span class="feature-label">Nose Wrinkle</span>
+                            <div class="feature-track">
+                                <div class="feature-fill" id="noseFill"></div>
+                            </div>
+                            <span class="feature-value" id="noseValue">0%</span>
+                        </div>
+                        <div class="feature-bar">
+                            <span class="feature-label">Lip Raise</span>
+                            <div class="feature-track">
+                                <div class="feature-fill" id="lipFill"></div>
+                            </div>
+                            <span class="feature-value" id="lipValue">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status & Recommendation -->
+                <div class="card" id="statusCard">
+                    <div class="card-title">Analysis & Recommendation</div>
+                    <div class="status-display">
+                        <div class="status-title" id="statusTitle">No Pain Detected</div>
+                        <p class="status-desc" id="statusDesc">
+                            Facial expression appears relaxed with no signs of discomfort.
+                        </p>
+                        
+                        <div class="recommendation-box" id="recommendationBox">
+                            <div class="recommendation-label">Recommendation</div>
+                            <p class="recommendation-text" id="recommendationText">
+                                Normal operation - robotic arm can continue at full speed.
+                            </p>
+                        </div>
+
+                        <div class="arm-status-box">
+                            <div class="arm-icon">🦾</div>
+                            <div class="arm-info">
+                                <div class="arm-label">Robotic Arm Status</div>
+                                <div class="arm-speed" id="armSpeed">Full Speed (100%)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Chart -->
+                <div class="card">
+                    <div class="card-title">Pain History</div>
+                    <div class="chart-container">
+                        <svg class="chart-svg" id="chart" viewBox="0 0 350 120" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="painGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color: #58a6ff; stop-opacity: 0.5" />
+                                    <stop offset="100%" style="stop-color: #58a6ff; stop-opacity: 0" />
+                                </linearGradient>
+                            </defs>
+                            <path class="chart-area" id="chartArea"></path>
+                            <path class="chart-line" id="chartLine"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let selectedSource = 'camera';
+        let historyData = [];
+        const maxHistoryPoints = 50;
+        let pollingInterval = null;
+
+        const levelColors = {
+            'NONE': { bg: 'rgba(63, 185, 80, 0.2)', color: '#3fb950' },
+            'MILD': { bg: 'rgba(210, 153, 34, 0.2)', color: '#d29922' },
+            'MODERATE': { bg: 'rgba(219, 109, 40, 0.2)', color: '#db6d28' },
+            'SEVERE': { bg: 'rgba(248, 81, 73, 0.2)', color: '#f85149' },
+            'EXTREME': { bg: 'rgba(219, 97, 162, 0.2)', color: '#db61a2' }
+        };
+
+        function selectSource(source) {
+            selectedSource = source;
+            document.getElementById('cameraOption').classList.toggle('active', source === 'camera');
+            document.getElementById('fileOption').classList.toggle('active', source === 'file');
+            document.getElementById('youtubeOption').classList.toggle('active', source === 'youtube');
+            document.getElementById('fileInputContainer').classList.toggle('visible', source === 'file');
+            document.getElementById('youtubeInputContainer').classList.toggle('visible', source === 'youtube');
+            document.getElementById('youtubeInfo').textContent = '';
+        }
+
+        async function startAnalysis() {
+            const data = { source: selectedSource };
+            
+            if (selectedSource === 'file') {
+                data.file_path = document.getElementById('filePathInput').value;
+                if (!data.file_path) {
+                    alert('Please enter a video file path');
+                    return;
+                }
+            } else if (selectedSource === 'youtube') {
+                data.youtube_url = document.getElementById('youtubeUrlInput').value;
+                if (!data.youtube_url) {
+                    alert('Please enter a YouTube URL');
+                    return;
+                }
+                document.getElementById('youtubeInfo').textContent = 'Loading YouTube video...';
+            }
+
+            try {
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('startBtn').textContent = '⏳ Loading...';
+                
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    isRunning = true;
+                    updateUIState();
+                    
+                    // Show YouTube info if available
+                    if (result.youtube_info) {
+                        document.getElementById('youtubeInfo').textContent = 
+                            `▶ ${result.youtube_info.title || 'YouTube Video'}`;
+                    }
+                    
+                    // Show video feed
+                    document.getElementById('videoFeed').src = '/video_feed';
+                    document.getElementById('videoFeed').style.display = 'block';
+                    document.getElementById('videoPlaceholder').style.display = 'none';
+                    
+                    // Start polling for readings
+                    startPolling();
+                } else {
+                    alert('Error: ' + result.error);
+                    document.getElementById('youtubeInfo').textContent = '';
+                }
+            } catch (error) {
+                alert('Failed to start: ' + error.message);
+                document.getElementById('youtubeInfo').textContent = '';
+            } finally {
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('startBtn').textContent = '▶ Start Analysis';
+            }
+        }
+
+        async function stopAnalysis() {
+            try {
+                await fetch('/api/stop', { method: 'POST' });
+            } catch (error) {
+                console.error('Stop error:', error);
+            }
+
+            isRunning = false;
+            updateUIState();
+            stopPolling();
+            
+            document.getElementById('videoFeed').style.display = 'none';
+            document.getElementById('videoPlaceholder').style.display = 'flex';
+        }
+
+        async function calibrate() {
+            try {
+                const response = await fetch('/api/calibrate', { method: 'POST' });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('statusDot').classList.add('calibrated');
+                    alert('Calibration successful! Baseline set from neutral expression.');
+                } else {
+                    alert('Calibration failed: ' + result.error);
+                }
+            } catch (error) {
+                alert('Calibration error: ' + error.message);
+            }
+        }
+
+        function updateUIState() {
+            document.getElementById('startBtn').disabled = isRunning;
+            document.getElementById('stopBtn').disabled = !isRunning;
+            document.getElementById('calibrateBtn').disabled = !isRunning;
+            
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (isRunning) {
+                statusDot.classList.add('active');
+                statusText.textContent = 'Analyzing';
+            } else {
+                statusDot.classList.remove('active');
+                statusText.textContent = 'Idle';
+            }
+        }
+
+        function startPolling() {
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/api/reading');
+                    const reading = await response.json();
+                    updateDashboard(reading);
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 100);
+        }
+
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
+        function updateDashboard(reading) {
+            if (!reading.face_detected) {
+                document.getElementById('painEmoji').textContent = '❓';
+                document.getElementById('statusTitle').textContent = 'No Face Detected';
+                return;
+            }
+
+            const desc = reading.description;
+            const colors = levelColors[reading.level] || levelColors['NONE'];
+
+            // Update pain meter
+            document.getElementById('painEmoji').textContent = desc.icon;
+            document.getElementById('painScore').textContent = `${reading.pain_score.toFixed(1)}%`;
+            document.getElementById('painScore').style.color = colors.color;
+            
+            const painLevel = document.getElementById('painLevel');
+            painLevel.textContent = reading.level;
+            painLevel.style.background = colors.bg;
+            painLevel.style.color = colors.color;
+
+            // Update feature bars
+            updateFeatureBar('brow', reading.brow_furrow);
+            updateFeatureBar('eye', reading.eye_squeeze);
+            updateFeatureBar('nose', reading.nose_wrinkle);
+            updateFeatureBar('lip', reading.lip_raise);
+
+            // Update status
+            document.getElementById('statusTitle').textContent = desc.title;
+            document.getElementById('statusTitle').style.color = colors.color;
+            document.getElementById('statusDesc').textContent = desc.description;
+            
+            const recommendationBox = document.getElementById('recommendationBox');
+            recommendationBox.style.borderLeftColor = colors.color;
+            recommendationBox.style.background = colors.bg;
+            document.querySelector('.recommendation-label').style.color = colors.color;
+            document.getElementById('recommendationText').textContent = desc.recommendation;
+            
+            document.getElementById('armSpeed').textContent = desc.arm_status;
+            document.getElementById('armSpeed').style.color = colors.color;
+
+            // Alert animation for severe/extreme
+            const statusCard = document.getElementById('statusCard');
+            if (reading.level === 'SEVERE' || reading.level === 'EXTREME') {
+                statusCard.classList.add('alert-pulse');
+            } else {
+                statusCard.classList.remove('alert-pulse');
+            }
+
+            // Update chart
+            updateChart(reading.pain_score);
+        }
+
+        function updateFeatureBar(name, value) {
+            const fill = document.getElementById(`${name}Fill`);
+            const valueEl = document.getElementById(`${name}Value`);
+            
+            fill.style.width = `${Math.min(100, value)}%`;
+            valueEl.textContent = `${value.toFixed(0)}%`;
+            
+            // Color based on intensity
+            if (value > 60) {
+                fill.style.background = '#f85149';
+            } else if (value > 30) {
+                fill.style.background = '#db6d28';
+            } else {
+                fill.style.background = '#58a6ff';
+            }
+        }
+
+        function updateChart(score) {
+            historyData.push(score);
+            if (historyData.length > maxHistoryPoints) {
+                historyData.shift();
+            }
+
+            const width = 350;
+            const height = 120;
+            const padding = 10;
+
+            if (historyData.length < 2) return;
+
+            const xStep = (width - padding * 2) / (maxHistoryPoints - 1);
+            const yScale = (height - padding * 2) / 100;
+
+            let linePath = '';
+            let areaPath = `M ${padding} ${height - padding} `;
+
+            historyData.forEach((value, index) => {
+                const x = padding + index * xStep;
+                const y = height - padding - (value * yScale);
+
+                if (index === 0) {
+                    linePath = `M ${x} ${y}`;
+                    areaPath += `L ${x} ${y} `;
+                } else {
+                    linePath += ` L ${x} ${y}`;
+                    areaPath += `L ${x} ${y} `;
+                }
+            });
+
+            const lastX = padding + (historyData.length - 1) * xStep;
+            areaPath += `L ${lastX} ${height - padding} Z`;
+
+            document.getElementById('chartLine').setAttribute('d', linePath);
+            document.getElementById('chartArea').setAttribute('d', areaPath);
+        }
+
+        // Initialize
+        updateUIState();
+    </script>
+</body>
+</html>
+

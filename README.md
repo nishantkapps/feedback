@@ -8,195 +8,182 @@ A multi-modal feedback system for controlling a robotic arm based on user pain/d
 # Install dependencies
 pip install -r requirements.txt
 
-# Start the dashboard (opens browser automatically)
+# Option 1: Piezo Sensor Dashboard (pressure detection)
 python start.py
-```
 
-Then click **"▶ Start Monitoring"** in the browser to begin.
+# Option 2: Face Pain Detection Dashboard (facial expression analysis)
+python face_detection/start.py
+```
 
 ## Overview
 
 This system provides feedback through three channels:
-1. **Camera Feedback** - Facial expression analysis for pain detection (future)
-2. **Pressure Sensors** - Arduino-based piezo sensors for force feedback ✅
-3. **EMG Sensors** - Electromyography signals from the body (future)
 
-## Current Implementation
+| Module | Status | Description |
+|--------|--------|-------------|
+| **Pressure Sensors** | ✅ Complete | Arduino-based piezo sensors for force feedback |
+| **Camera Feedback** | ✅ Complete | Facial expression analysis for pain detection |
+| **EMG Sensors** | 🔜 Planned | Electromyography signals from the body |
 
-### Piezo Sensor Module
+---
 
-The pressure detection module uses a piezo sensor connected to an Arduino to detect and measure pressure/force applied during robotic arm interaction.
+## Module 1: Piezo Sensor (Pressure Detection)
 
-## Running Options
+Detects pressure/force using a piezo sensor connected to Arduino.
 
-### Option 1: Web Dashboard (Recommended)
+### Quick Start
 
 ```bash
-# With default data (sample_sensor_data.csv)
 python start.py
-
-# With custom data file
-python start.py data/test_small.csv
 ```
 
-Opens an interactive dashboard at **http://localhost:5000** with:
+Opens dashboard at **http://localhost:5000**
+
+### Features
 - Real-time pressure gauge
-- Color-coded status levels
-- Text descriptions and recommendations
-- Pressure history chart
-- Robotic arm status indicator
+- 5-level pressure categorization (NONE → CRITICAL)
+- Robotic arm speed recommendations
+- Supports hardware (Arduino) or file-based simulation
 
-### Option 2: Terminal Mode
+### Pressure Levels
+
+| Level | Range | Action |
+|-------|-------|--------|
+| NONE | 0-5% | Full Speed (100%) |
+| LIGHT | 5-20% | Reduced Speed (80%) |
+| MODERATE | 20-50% | Caution Mode (50%) |
+| HIGH | 50-80% | Paused (20%) |
+| CRITICAL | 80-100% | EMERGENCY STOP |
+
+[📖 Full Piezo Sensor Documentation](sensors/)
+
+---
+
+## Module 2: Face Pain Detection
+
+Analyzes facial expressions to detect pain using computer vision.
+
+### Quick Start
 
 ```bash
-# Auto-detect (file simulation if no Arduino)
-python run.py
-
-# Force file simulation
-python run.py --file
-
-# Custom data file with speed control
-python run.py --file --data data/test_small.csv --speed 10 --no-loop
-
-# Force hardware mode (requires Arduino)
-python run.py --hardware
+python face_detection/start.py
 ```
 
-### Option 3: Direct Flask Server
+Opens dashboard at **http://localhost:5001**
 
-```bash
-python web/app.py data/sample_sensor_data.csv
-```
+### Features
+- Real-time facial landmark detection (MediaPipe)
+- Pain level analysis based on FACS (Facial Action Coding System)
+- Webcam or video file input
+- Calibration for personalized baseline
+- Live annotated video feed
 
-## Hardware Setup (For Real Arduino)
+### Pain Indicators Analyzed
 
-### Requirements
-- Arduino board (Uno, Nano, or compatible)
-- Piezo sensor/disc
-- 1MΩ resistor (parallel with piezo sensor for stability)
-- Jumper wires
+| Feature | Description |
+|---------|-------------|
+| Brow Furrow | Lowered/furrowed eyebrows |
+| Eye Squeeze | Narrowed or closed eyes |
+| Nose Wrinkle | Wrinkled nose bridge |
+| Lip Raise | Raised upper lip |
 
-### Wiring Diagram
+### Pain Levels
 
-```
-Piezo Sensor          Arduino
-------------          -------
-  (+) ──────────────── A0
-  (-) ──────────────── GND
-  
-  [1MΩ resistor in parallel with piezo sensor]
-```
+| Level | Score | Emoji | Action |
+|-------|-------|-------|--------|
+| NONE | 0-10% | 😊 | Full Speed (100%) |
+| MILD | 10-30% | 😐 | Reduced Speed (80%) |
+| MODERATE | 30-55% | 😣 | Caution Mode (50%) |
+| SEVERE | 55-80% | 😖 | Paused (20%) |
+| EXTREME | 80-100% | 😫 | EMERGENCY STOP |
 
-### Arduino Setup
+[📖 Full Face Detection Documentation](face_detection/README.md)
 
-1. Open `arduino/piezo_sensor/piezo_sensor.ino` in Arduino IDE
-2. Select your board type (Tools > Board)
-3. Select the correct port (Tools > Port)
-4. Upload the sketch (Ctrl+U or Upload button)
-
-## Pressure Levels
-
-The system categorizes pressure into five levels:
-
-| Level | Range | Color | Robotic Arm Action |
-|-------|-------|-------|-------------------|
-| NONE | 0-5% | 🟢 Green | Full Speed (100%) |
-| LIGHT | 5-20% | 🟡 Yellow | Reduced Speed (80%) |
-| MODERATE | 20-50% | 🟠 Orange | Caution Mode (50%) |
-| HIGH | 50-80% | 🔴 Red | Paused (20%) |
-| CRITICAL | 80-100% | 🔴 Dark Red | EMERGENCY STOP (0%) |
+---
 
 ## Project Structure
 
 ```
 feedback/
-├── start.py                    # Quick start script
-├── run.py                      # Terminal-based runner
+├── start.py                    # Piezo sensor quick start
+├── run.py                      # Terminal-based piezo runner
 ├── requirements.txt
 ├── README.md
-├── arduino/
+│
+├── arduino/                    # Arduino firmware
 │   └── piezo_sensor/
-│       └── piezo_sensor.ino    # Arduino firmware
-├── data/
-│   ├── sample_sensor_data.csv  # Full test data (113 readings)
-│   └── test_small.csv          # Small test data (15 readings)
-├── sensors/
+│       └── piezo_sensor.ino
+│
+├── data/                       # Sample sensor data
+│   ├── sample_sensor_data.csv
+│   └── test_small.csv
+│
+├── sensors/                    # Piezo sensor module
 │   ├── __init__.py
-│   ├── piezo_reader.py         # Hardware sensor interface
-│   └── file_reader.py          # File-based mock sensor
-└── web/
-    ├── app.py                  # Flask web server
-    └── templates/
-        └── dashboard.html      # Dashboard UI
+│   ├── piezo_reader.py
+│   └── file_reader.py
+│
+├── web/                        # Piezo sensor dashboard
+│   ├── app.py
+│   └── templates/
+│       └── dashboard.html
+│
+└── face_detection/             # Face pain detection module
+    ├── __init__.py
+    ├── pain_detector.py        # Core pain detection
+    ├── video_source.py         # Video/camera handler
+    ├── start.py                # Quick start script
+    ├── README.md
+    └── web/
+        ├── app.py
+        └── templates/
+            └── dashboard.html
 ```
 
-## API Reference
+## Hardware Requirements
 
-### PiezoSensor Class (Hardware)
+### For Piezo Sensor Module
+- Arduino board (Uno, Nano, or compatible)
+- Piezo sensor/disc
+- 1MΩ resistor
+- Jumper wires
 
-```python
-from sensors import PiezoSensor
+### For Face Detection Module
+- Webcam (or video file)
+- Good lighting for face visibility
 
-with PiezoSensor() as sensor:
-    def on_pressure(reading):
-        print(f"Pressure: {reading.percent}%")
-        if reading.level == "CRITICAL":
-            # Trigger emergency stop
-            pass
-    
-    sensor.start_reading(callback=on_pressure)
-```
+## Installation
 
-### FilePiezoSensor Class (Testing)
-
-```python
-from sensors import FilePiezoSensor
-
-with FilePiezoSensor('data/test_small.csv', playback_speed=2.0) as sensor:
-    sensor.start_reading(callback=lambda r: print(r.level))
-```
-
-### PressureReading Dataclass
-
-```python
-@dataclass
-class PressureReading:
-    raw: int         # Raw analog value (0-1023)
-    filtered: int    # Filtered value (moving average)
-    pressure: int    # Pressure above baseline
-    percent: float   # Pressure percentage (0-100%)
-    level: str       # NONE/LIGHT/MODERATE/HIGH/CRITICAL
-    timestamp: int   # Arduino millis() timestamp
-    received_at: float  # Python time.time()
-```
-
-## Troubleshooting
-
-### Port Not Found
-```python
-from sensors import PiezoSensor
-print(PiezoSensor.list_available_ports())
-```
-
-### Permission Denied (Linux)
 ```bash
-sudo chmod 666 /dev/ttyUSB0
-# Or add user to dialout group:
-sudo usermod -a -G dialout $USER
+# Clone/download the project
+cd feedback
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# For piezo sensor with Arduino:
+# Upload arduino/piezo_sensor/piezo_sensor.ino via Arduino IDE
 ```
 
-### Dashboard Not Loading
-- Ensure Flask is installed: `pip install flask`
-- Check if port 5000 is available
-- Try: `python web/app.py data/sample_sensor_data.csv`
+## Running Both Dashboards
+
+You can run both modules simultaneously on different ports:
+
+```bash
+# Terminal 1: Piezo Sensor (port 5000)
+python start.py
+
+# Terminal 2: Face Detection (port 5001)
+python face_detection/start.py
+```
 
 ## Future Development
 
-- [ ] Camera-based facial expression analysis
 - [ ] EMG sensor integration
-- [ ] Sensor fusion algorithm
+- [ ] Sensor fusion (combine all inputs)
 - [ ] ROS2 integration for robotic arm control
-- [ ] WebSocket for lower latency updates
+- [ ] WebSocket for lower latency
+- [ ] Combined dashboard view
 
 ## License
 
