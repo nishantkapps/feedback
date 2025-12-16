@@ -1,0 +1,233 @@
+[
+  {
+    "timestamp": 1765886609.614757,
+    "pain_level": 0,
+    "pain_level_name": "NONE",
+    "pain_score": 0.0,
+    "source": "fused",
+    "confidence": 0.96,
+    "speed_modifier": 1.0,
+    "amplitude_modifier": 1.0,
+    "force_modifier": 1.0,
+    "should_pause": false,
+    "should_stop": false,
+    "details": {
+      "piezo": {
+        "raw": 0,
+        "filtered": 0,
+        "pressure": 0,
+        "timestamp": 1765886609614
+      },
+      "face": {
+        "brow_furrow": 0.0,
+        "eye_squeeze": 0.0,
+        "nose_wrinkle": 0.0,
+        "lip_raise": 0.0,
+        "face_detected": true,
+        "frame_number": 1
+      },
+      "weights": {
+        "piezo": 0.6,
+        "face": 0.4
+      }
+    }
+  },
+  {
+    "timestamp": 1765886610.1164398,
+    "pain_level": 1,
+    "pain_level_name": "LIGHT",
+    "pain_score": 16.670841487279844,
+    "source": "fused",
+    "confidence": 0.96,
+    "speed_modifier": 0.7200000000000001,
+    "amplitude_modifier": 0.81,
+    "force_modifier": 0.765,
+    "should_pause": false,
+    "should_stop": false,
+    "details": {
+      "piezo": {
+        "raw": 50,
+        "filtered": 50,
+        "pressure": 50,
+        "timestamp": 1765886610115
+      },
+      "face": {
+        "brow_furrow": 0.3,
+        "eye_squeeze": 0.3,
+        "nose_wrinkle": 0.3,
+        "lip_raise": 0.3,
+        "face_detected": true,
+        "frame_number": 1
+      },
+      "weights": {
+        "piezo": 0.6,
+        "face": 0.4
+      }
+    }
+  },
+  {
+    "timestamp": 1765886610.6180348,
+    "pain_level": 2,
+    "pain_level_name": "MODERATE",
+    "pain_score": 35.61252446183953,
+    "source": "fused",
+    "confidence": 0.96,
+    "speed_modifier": 0.45,
+    "amplitude_modifier": 0.63,
+    "force_modifier": 0.54,
+    "should_pause": false,
+    "should_stop": false,
+    "details": {
+      "piezo": {
+        "raw": 150,
+        "filtered": 150,
+        "pressure": 150,
+        "timestamp": 1765886610617
+      },
+      "face": {
+        "brow_furrow": 0.5,
+        "eye_squeeze": 0.5,
+        "nose_wrinkle": 0.5,
+        "lip_raise": 0.5,
+        "face_detected": true,
+        "frame_number": 1
+      },
+      "weights": {
+        "piezo": 0.6,
+        "face": 0.4
+      }
+    }
+  },
+  {
+    "timestamp": 1765886611.12081,
+    "pain_level": 3,
+    "pain_level_name": "HIGH",
+    "pain_score": 60.42504892367906,
+    "source": "fused",
+    "confidence": 0.96,
+    "speed_modifier": 0.16258317025440316,
+    "amplitude_modifier": 0.40645792563600786,
+    "force_modifier": 0.2438747553816047,
+    "should_pause": true,
+    "should_stop": false,
+    "details": {
+      "piezo": {
+        "raw": 300,
+        "filtered": 300,
+        "pressure": 300,
+        "timestamp": 1765886611119
+      },
+      "face": {
+        "brow_furrow": 0.7,
+        "eye_squeeze": 0.7,
+        "nose_wrinkle": 0.7,
+        "lip_raise": 0.7,
+        "face_detected": true,
+        "frame_number": 1
+      },
+      "weights": {
+        "piezo": 0.6,
+        "face": 0.4
+      }
+    }
+  },
+  {
+    "timestamp": 1765886611.6239908,
+    "pain_level": 4,
+    "pain_level_name": "CRITICAL",
+    "pain_score": 85.23757338551859,
+    "source": "fused",
+    "confidence": 0.96,
+    "speed_modifier": 0.0,
+    "amplitude_modifier": 0.0,
+    "force_modifier": 0.0,
+    "should_pause": false,
+    "should_stop": true,
+    "details": {
+      "piezo": {
+        "raw": 450,
+        "filtered": 450,
+        "pressure": 450,
+        "timestamp": 1765886611623
+      },
+      "face": {
+        "brow_furrow": 0.9,
+        "eye_squeeze": 0.9,
+        "nose_wrinkle": 0.9,
+        "lip_raise": 0.9,
+        "face_detected": true,
+        "frame_number": 1
+      },
+      "weights": {
+        "piezo": 0.6,
+        "face": 0.4
+      }
+    }
+  },
+  {
+    "timestamp": 1765886612.1269238,
+    "pain_level": 1,
+    "pain_level_name": "LIGHT",
+    "pain_score": 18.941682974559686,
+    "source": "fused",
+    "confidence": 0.96,
+    "speed_modifier": 0.6434442270058709,
+    "amplitude_modifier": 0.7238747553816047,
+    "force_modifier": 0.6836594911937378,
+    "should_pause": false,
+    "should_stop": false,
+    "details": {
+      "piezo": {
+        "raw": 100,
+        "filtered": 100,
+        "pressure": 100,
+        "timestamp": 1765886612126
+      },
+      "face": {
+        "brow_furrow": 0.2,
+        "eye_squeeze": 0.2,
+        "nose_wrinkle": 0.2,
+        "lip_raise": 0.2,
+        "face_detected": true,
+        "frame_number": 1
+      },
+      "weights": {
+        "piezo": 0.6,
+        "face": 0.4
+      }
+    }
+  },
+  {
+    "timestamp": 1765886612.62945,
+    "pain_level": 0,
+    "pain_level_name": "NONE",
+    "pain_score": 0.0,
+    "source": "fused",
+    "confidence": 0.96,
+    "speed_modifier": 1.0,
+    "amplitude_modifier": 1.0,
+    "force_modifier": 1.0,
+    "should_pause": false,
+    "should_stop": false,
+    "details": {
+      "piezo": {
+        "raw": 0,
+        "filtered": 0,
+        "pressure": 0,
+        "timestamp": 1765886612628
+      },
+      "face": {
+        "brow_furrow": 0.0,
+        "eye_squeeze": 0.0,
+        "nose_wrinkle": 0.0,
+        "lip_raise": 0.0,
+        "face_detected": true,
+        "frame_number": 1
+      },
+      "weights": {
+        "piezo": 0.6,
+        "face": 0.4
+      }
+    }
+  }
+]

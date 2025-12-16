@@ -12,9 +12,9 @@
  */
 
 const int PIEZO_PIN = A0;           // Analog pin connected to piezo sensor
-const int SAMPLE_RATE_MS = 10;      // Sampling rate in milliseconds
+const int SAMPLE_RATE_MS = 100;     // Sampling rate in milliseconds (0.1 seconds)
 const int THRESHOLD = 10;           // Minimum value to register as pressure
-const int CALIBRATION_SAMPLES = 100; // Number of samples for baseline calibration
+const int CALIBRATION_SAMPLES = 50; // Number of samples for baseline calibration
 
 // Calibration variables
 int baselineValue = 0;

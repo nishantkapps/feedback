@@ -1,15 +1,17 @@
 """
 Video Source Handler
-Handles video file, camera, and YouTube input for face pain detection.
+Handles video file, camera, and YouTube streaming for face pain detection.
+Supports progressive loading for long videos.
 """
 
 import time
 import threading
 import re
-import subprocess
+import os
 from pathlib import Path
 from typing import Optional, Generator
 from dataclasses import dataclass
+from queue import Queue, Empty
 
 try:
     import cv2
@@ -46,12 +48,14 @@ def is_youtube_url(url: str) -> bool:
     return False
 
 
-def get_youtube_stream_url(youtube_url: str) -> Optional[str]:
+def get_youtube_stream_url(youtube_url: str, quality: str = 'medium') -> Optional[str]:
     """
     Get direct stream URL from YouTube using yt-dlp.
+    Uses format that supports streaming (not download-only).
     
     Args:
         youtube_url: YouTube video URL
+        quality: 'low', 'medium', or 'high'
         
     Returns:
         Direct stream URL or None if failed
@@ -59,27 +63,47 @@ def get_youtube_stream_url(youtube_url: str) -> Optional[str]:
     try:
         import yt_dlp
         
+        # Format selection for streaming compatibility
+        # Prefer formats that can be streamed (not fragmented)
+        format_map = {
+            'low': 'best[height<=360][ext=mp4]/best[height<=360]/worst',
+            'medium': 'best[height<=480][ext=mp4]/best[height<=480]/best[height<=720]',
+            'high': 'best[height<=720][ext=mp4]/best[height<=720]/best'
+        }
+        
         ydl_opts = {
-            'format': 'best[height<=720][ext=mp4]/best[height<=720]/best',
+            'format': format_map.get(quality, format_map['medium']),
             'quiet': True,
             'no_warnings': True,
+            'extract_flat': False,
         }
+        
+        print(f"Extracting stream URL (quality: {quality})...")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(youtube_url, download=False)
             
-            # Get the URL
+            # Get the direct URL
             if 'url' in info:
                 return info['url']
             
-            # For some formats, the URL is in requested_formats
+            # For formats with separate audio/video, get video URL
             if 'requested_formats' in info:
                 for fmt in info['requested_formats']:
-                    if 'url' in fmt:
+                    if fmt.get('vcodec') != 'none' and 'url' in fmt:
                         return fmt['url']
             
             # Fallback to formats list
             if 'formats' in info:
+                # Prefer mp4 formats that are streamable
+                for fmt in reversed(info['formats']):
+                    if (fmt.get('url') and 
+                        fmt.get('vcodec') != 'none' and
+                        fmt.get('ext') == 'mp4' and
+                        not fmt.get('fragments')):  # Avoid fragmented streams
+                        return fmt['url']
+                
+                # Last resort: any video format
                 for fmt in reversed(info['formats']):
                     if fmt.get('url') and fmt.get('vcodec') != 'none':
                         return fmt['url']
@@ -117,9 +141,67 @@ def get_youtube_info(youtube_url: str) -> dict:
         return {}
 
 
+class FrameBuffer:
+    """Thread-safe frame buffer for progressive video loading."""
+    
+    def __init__(self, max_size: int = 60):
+        self._queue = Queue(maxsize=max_size)
+        self._stop_flag = threading.Event()
+        self._eof = threading.Event()
+        self._error = None
+        
+    def put(self, frame_info: FrameInfo, timeout: float = 1.0) -> bool:
+        """Add frame to buffer."""
+        if self._stop_flag.is_set():
+            return False
+        try:
+            self._queue.put(frame_info, timeout=timeout)
+            return True
+        except:
+            return False
+    
+    def get(self, timeout: float = 1.0) -> Optional[FrameInfo]:
+        """Get frame from buffer."""
+        try:
+            return self._queue.get(timeout=timeout)
+        except Empty:
+            return None
+    
+    def stop(self):
+        """Signal to stop."""
+        self._stop_flag.set()
+    
+    def set_eof(self):
+        """Signal end of file."""
+        self._eof.set()
+    
+    def set_error(self, error: str):
+        """Set error message."""
+        self._error = error
+        self._stop_flag.set()
+    
+    @property
+    def is_stopped(self) -> bool:
+        return self._stop_flag.is_set()
+    
+    @property
+    def is_eof(self) -> bool:
+        return self._eof.is_set() and self._queue.empty()
+    
+    @property
+    def error(self) -> Optional[str]:
+        return self._error
+    
+    @property
+    def size(self) -> int:
+        return self._queue.qsize()
+
+
 class VideoSource:
     """
-    Video source handler supporting camera, file, and YouTube input.
+    Video source handler supporting camera, file, and YouTube streaming.
+    
+    For YouTube videos, uses progressive streaming to start playback quickly.
     
     Usage:
         # From camera
@@ -128,7 +210,7 @@ class VideoSource:
         # From file
         source = VideoSource(file_path='video.mp4')
         
-        # From YouTube
+        # From YouTube (streams progressively)
         source = VideoSource(youtube_url='https://www.youtube.com/watch?v=...')
         
         # Read frames
@@ -142,7 +224,9 @@ class VideoSource:
         camera: Optional[int] = None,
         youtube_url: Optional[str] = None,
         target_fps: float = 30.0,
-        resize_width: Optional[int] = None
+        resize_width: Optional[int] = None,
+        youtube_quality: str = 'medium',
+        buffer_size: int = 60
     ):
         """
         Initialize video source.
@@ -153,6 +237,8 @@ class VideoSource:
             youtube_url: YouTube video URL
             target_fps: Target frame rate for processing
             resize_width: Resize frames to this width (maintains aspect ratio)
+            youtube_quality: Quality for YouTube ('low', 'medium', 'high')
+            buffer_size: Frame buffer size for streaming
         """
         # Validate inputs
         sources = sum([file_path is not None, camera is not None, youtube_url is not None])
@@ -167,6 +253,8 @@ class VideoSource:
         self.youtube_url = youtube_url
         self.target_fps = target_fps
         self.resize_width = resize_width
+        self.youtube_quality = youtube_quality
+        self.buffer_size = buffer_size
         
         self._cap: Optional[cv2.VideoCapture] = None
         self._is_camera = camera is not None
@@ -176,6 +264,10 @@ class VideoSource:
         self._start_time = 0
         self._stop_flag = threading.Event()
         self._youtube_info: dict = {}
+        
+        # For progressive loading
+        self._frame_buffer: Optional[FrameBuffer] = None
+        self._reader_thread: Optional[threading.Thread] = None
         
         # Video properties (set after open)
         self.fps = 0
@@ -196,20 +288,31 @@ class VideoSource:
             source_name = f"camera {self.camera_index}"
             
         elif self._is_youtube:
-            print(f"Fetching YouTube stream: {self.youtube_url}")
+            print(f"Connecting to YouTube: {self.youtube_url}")
             
             # Get video info
             self._youtube_info = get_youtube_info(self.youtube_url)
             if self._youtube_info:
-                print(f"Video: {self._youtube_info.get('title', 'Unknown')}")
+                title = self._youtube_info.get('title', 'Unknown')
+                duration = self._youtube_info.get('duration', 0)
+                print(f"Video: {title}")
+                print(f"Duration: {duration // 60}m {duration % 60}s")
             
             # Get stream URL
-            self._stream_url = get_youtube_stream_url(self.youtube_url)
+            self._stream_url = get_youtube_stream_url(self.youtube_url, self.youtube_quality)
             if not self._stream_url:
                 raise RuntimeError("Failed to get YouTube stream URL. Check the URL and try again.")
             
-            print("Opening stream...")
-            self._cap = cv2.VideoCapture(self._stream_url)
+            print("Opening stream (this may take a few seconds)...")
+            
+            # Set environment variable to help with streaming
+            os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp'
+            
+            self._cap = cv2.VideoCapture(self._stream_url, cv2.CAP_FFMPEG)
+            
+            # Set buffer size for smoother streaming
+            self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)
+            
             source_name = "YouTube"
             
         else:
@@ -237,11 +340,85 @@ class VideoSource:
         self._stop_flag.clear()
         
         print(f"Opened {source_name}: {self.width}x{self.height} @ {self.fps:.1f}fps")
+        
+        # Start background reader for YouTube
+        if self._is_youtube:
+            self._start_background_reader()
+        
         return True
+    
+    def _start_background_reader(self):
+        """Start background thread to buffer frames."""
+        self._frame_buffer = FrameBuffer(max_size=self.buffer_size)
+        self._reader_thread = threading.Thread(target=self._background_read, daemon=True)
+        self._reader_thread.start()
+        
+        # Wait for initial frames to buffer
+        print("Buffering frames...")
+        timeout = time.time() + 10  # 10 second timeout
+        while self._frame_buffer.size < 10 and time.time() < timeout:
+            if self._frame_buffer.error:
+                raise RuntimeError(f"Stream error: {self._frame_buffer.error}")
+            time.sleep(0.1)
+        
+        if self._frame_buffer.size > 0:
+            print(f"Buffered {self._frame_buffer.size} frames, starting playback...")
+        else:
+            print("Warning: No frames buffered yet, playback may be choppy")
+    
+    def _background_read(self):
+        """Background thread to continuously read frames."""
+        consecutive_failures = 0
+        max_failures = 30  # Allow some failures for network hiccups
+        
+        while not self._stop_flag.is_set() and not self._frame_buffer.is_stopped:
+            try:
+                ret, frame = self._cap.read()
+                
+                if not ret or frame is None:
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_failures:
+                        self._frame_buffer.set_eof()
+                        break
+                    time.sleep(0.1)
+                    continue
+                
+                consecutive_failures = 0
+                self._frame_count += 1
+                
+                # Resize if needed
+                if self.resize_width and frame.shape[1] != self.resize_width:
+                    aspect = frame.shape[0] / frame.shape[1]
+                    new_height = int(self.resize_width * aspect)
+                    frame = cv2.resize(frame, (self.resize_width, new_height))
+                
+                frame_info = FrameInfo(
+                    frame=frame,
+                    frame_number=self._frame_count,
+                    timestamp=time.time() - self._start_time,
+                    fps=self.fps,
+                    total_frames=self.total_frames,
+                    width=frame.shape[1],
+                    height=frame.shape[0]
+                )
+                
+                if not self._frame_buffer.put(frame_info, timeout=1.0):
+                    break
+                    
+            except Exception as e:
+                self._frame_buffer.set_error(str(e))
+                break
     
     def close(self):
         """Release video source."""
         self._stop_flag.set()
+        
+        if self._frame_buffer:
+            self._frame_buffer.stop()
+        
+        if self._reader_thread and self._reader_thread.is_alive():
+            self._reader_thread.join(timeout=2.0)
+        
         if self._cap:
             self._cap.release()
             self._cap = None
@@ -256,6 +433,14 @@ class VideoSource:
         if not self._cap or not self._cap.isOpened():
             return None
         
+        # For YouTube, read from buffer
+        if self._is_youtube and self._frame_buffer:
+            frame_info = self._frame_buffer.get(timeout=0.5)
+            if frame_info is None and self._frame_buffer.is_eof:
+                return None
+            return frame_info
+        
+        # Direct read for camera and local files
         ret, frame = self._cap.read()
         if not ret or frame is None:
             return None
@@ -320,6 +505,8 @@ class VideoSource:
     def stop(self):
         """Signal to stop frame iteration."""
         self._stop_flag.set()
+        if self._frame_buffer:
+            self._frame_buffer.stop()
     
     @property
     def is_camera(self) -> bool:
@@ -363,9 +550,16 @@ class VideoSource:
         else:
             return "file"
     
+    @property
+    def buffer_status(self) -> str:
+        """Get buffer status for YouTube streams."""
+        if self._frame_buffer:
+            return f"{self._frame_buffer.size}/{self.buffer_size} frames"
+        return "N/A"
+    
     def seek(self, frame_number: int):
         """Seek to specific frame (video files only)."""
-        if self._is_camera:
+        if self._is_camera or self._is_youtube:
             return
         if self._cap:
             self._cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)

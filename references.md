@@ -94,17 +94,48 @@ filtered_value = (sum of last N readings) / N
 
 ---
 
-### 5. Pressure Level Classification
+### 5. Pressure Classification Model
 
-**Threshold-based Classification:**
+**Model:** `PressureClassifier` (in `sensors/file_reader.py`)
 
-| Level | Threshold | Response |
+**Purpose:** Classify raw pressure readings into severity levels
+
+**Input:** Raw pressure value (0-511)
+
+**Output:** Classification level and percentage
+
+**Algorithm:** Threshold-based classification
+
+```python
+# Convert pressure to percentage
+percent = (pressure / 511) * 100
+
+# Classify based on thresholds
+if percent < 5:    return "NONE"
+if percent < 20:   return "LIGHT"
+if percent < 50:   return "MODERATE"
+if percent < 80:   return "HIGH"
+else:              return "CRITICAL"
+```
+
+**Classification Thresholds:**
+
+| Level | Pressure % | Response |
 |-------|-----------|----------|
 | NONE | 0-5% | Normal operation |
 | LIGHT | 5-20% | Monitor |
 | MODERATE | 20-50% | Reduce speed |
 | HIGH | 50-80% | Pause operation |
 | CRITICAL | 80-100% | Emergency stop |
+
+**CSV Input Format:**
+```csv
+timestamp,pressure
+0,0
+100,18
+200,63
+...
+```
 
 **Reference:**
 - Based on tactile feedback research for human-robot interaction safety

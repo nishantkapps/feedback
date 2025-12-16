@@ -177,10 +177,167 @@ python start.py
 python face_detection/start.py
 ```
 
+---
+
+## Module 3: IRDS Integration
+
+Connect pain detection outputs to the [IRDS Gesture Recognition System](/home/nishant/project/irds) for automatic gesture adjustment based on detected pain levels.
+
+### Quick Start
+
+```bash
+# Run demo with simulated data
+python integration/irds_bridge.py --demo
+
+# Start bridge for real operation
+python integration/irds_bridge.py --output-file data/irds_feedback.json
+```
+
+### How It Works
+
+```
+Pain Detection          →     IRDS Bridge     →     IRDS Gesture Model
+(piezo + face)                (fusion)              (speed/amplitude/force)
+```
+
+The bridge:
+1. Collects pain readings from piezo sensors and face detection
+2. Fuses data from multiple sources
+3. Calculates gesture modifiers (speed, amplitude, force)
+4. Outputs JSON that IRDS can consume
+
+### Output Format
+
+```json
+{
+    "pain_level": 2,
+    "speed_modifier": 0.5,
+    "amplitude_modifier": 0.7,
+    "force_modifier": 0.6,
+    "should_pause": false,
+    "should_stop": false
+}
+```
+
+### Gesture Modifier Mapping
+
+| Pain Level | Speed | Amplitude | Force | Action |
+|------------|-------|-----------|-------|--------|
+| NONE (0) | 100% | 100% | 100% | Normal |
+| LIGHT (1) | 80% | 90% | 85% | Reduced |
+| MODERATE (2) | 50% | 70% | 60% | Caution |
+| HIGH (3) | 20% | 50% | 30% | **Pause** |
+| CRITICAL (4) | 0% | 0% | 0% | **STOP** |
+
+[📖 Full IRDS Integration Documentation](integration/README.md)
+
+---
+
+## Stopping Processes
+
+To kill all running dashboard processes:
+
+```bash
+./kill_all.sh
+```
+
+---
+
+## Project Structure
+
+```
+feedback/
+├── start.py                    # Piezo sensor quick start
+├── run.py                      # Terminal-based piezo runner
+├── kill_all.sh                 # Stop all processes
+├── requirements.txt
+├── README.md
+├── references.md               # External model references
+│
+├── arduino/                    # Arduino firmware
+│   └── piezo_sensor/
+│       └── piezo_sensor.ino
+│
+├── data/                       # Sample sensor data
+│   ├── sample_sensor_data.csv
+│   ├── test_small.csv
+│   └── irds_feedback.json      # IRDS output file
+│
+├── sensors/                    # Piezo sensor module
+│   ├── __init__.py
+│   ├── piezo_reader.py
+│   └── file_reader.py
+│
+├── web/                        # Piezo sensor dashboard
+│   ├── app.py
+│   └── templates/
+│       └── dashboard.html
+│
+├── face_detection/             # Face pain detection module
+│   ├── __init__.py
+│   ├── pain_detector.py        # Core pain detection
+│   ├── video_source.py         # Video/camera handler
+│   ├── start.py                # Quick start script
+│   ├── create_sample_video.py  # Generate test videos
+│   ├── README.md
+│   └── web/
+│       ├── app.py
+│       └── templates/
+│           └── dashboard.html
+│
+└── integration/                # IRDS integration module
+    ├── __init__.py
+    ├── irds_interface.py       # Core interface classes
+    ├── irds_bridge.py          # Bridge script
+    ├── irds_consumer_example.py # Example for IRDS
+    └── README.md
+```
+
+## Hardware Requirements
+
+### For Piezo Sensor Module
+- Arduino board (Uno, Nano, or compatible)
+- Piezo sensor/disc
+- 1MΩ resistor
+- Jumper wires
+
+### For Face Detection Module
+- Webcam (or video file)
+- Good lighting for face visibility
+
+## Installation
+
+```bash
+# Clone/download the project
+cd feedback
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# For piezo sensor with Arduino:
+# Upload arduino/piezo_sensor/piezo_sensor.ino via Arduino IDE
+```
+
+## Running All Modules
+
+```bash
+# Terminal 1: Piezo Sensor Dashboard (port 5000)
+python start.py
+
+# Terminal 2: Face Detection Dashboard (port 5001)
+python face_detection/start.py
+
+# Terminal 3: IRDS Bridge (outputs to file)
+python integration/irds_bridge.py --output-file data/irds_feedback.json
+
+# Stop all:
+./kill_all.sh
+```
+
 ## Future Development
 
 - [ ] EMG sensor integration
-- [ ] Sensor fusion (combine all inputs)
+- [x] Sensor fusion (combine all inputs) ✅ IRDS Integration
 - [ ] ROS2 integration for robotic arm control
 - [ ] WebSocket for lower latency
 - [ ] Combined dashboard view

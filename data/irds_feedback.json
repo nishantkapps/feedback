@@ -1,0 +1,33 @@
+{
+  "timestamp": 1765886612.62945,
+  "pain_level": 0,
+  "pain_level_name": "NONE",
+  "pain_score": 0.0,
+  "source": "fused",
+  "confidence": 0.96,
+  "speed_modifier": 1.0,
+  "amplitude_modifier": 1.0,
+  "force_modifier": 1.0,
+  "should_pause": false,
+  "should_stop": false,
+  "details": {
+    "piezo": {
+      "raw": 0,
+      "filtered": 0,
+      "pressure": 0,
+      "timestamp": 1765886612628
+    },
+    "face": {
+      "brow_furrow": 0.0,
+      "eye_squeeze": 0.0,
+      "nose_wrinkle": 0.0,
+      "lip_raise": 0.0,
+      "face_detected": true,
+      "frame_number": 1
+    },
+    "weights": {
+      "piezo": 0.6,
+      "face": 0.4
+    }
+  }
+}

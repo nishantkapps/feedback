@@ -3,7 +3,8 @@ File-based Sensor Reader for Testing
 Part of Robotic Arm Feedback System
 
 This module provides a mock sensor interface that reads from CSV files,
-allowing testing without actual hardware.
+allowing testing without actual hardware. The classification model
+determines pressure levels from raw sensor readings.
 """
 
 import csv
@@ -16,10 +17,100 @@ from collections import deque
 from .piezo_reader import PressureReading
 
 
+class PressureClassifier:
+    """
+    Model for classifying pressure readings into severity levels.
+    
+    This classifier uses threshold-based classification to determine
+    the pressure level from raw sensor readings.
+    """
+    
+    # Pressure level constants
+    LEVEL_NONE = "NONE"
+    LEVEL_LIGHT = "LIGHT"
+    LEVEL_MODERATE = "MODERATE"
+    LEVEL_HIGH = "HIGH"
+    LEVEL_CRITICAL = "CRITICAL"
+    
+    # Classification thresholds (pressure values 0-511, which maps to 0-100%)
+    # These thresholds can be tuned based on sensor calibration
+    THRESHOLDS = {
+        'NONE': (0, 5),        # 0-5% pressure
+        'LIGHT': (5, 20),      # 5-20% pressure
+        'MODERATE': (20, 50),  # 20-50% pressure
+        'HIGH': (50, 80),      # 50-80% pressure
+        'CRITICAL': (80, 100), # 80-100% pressure
+    }
+    
+    # Max pressure value (baseline offset from 1023 max ADC value)
+    MAX_PRESSURE = 511
+    
+    def __init__(self):
+        """Initialize the pressure classifier."""
+        pass
+    
+    def pressure_to_percent(self, pressure: int) -> float:
+        """
+        Convert raw pressure value to percentage.
+        
+        Args:
+            pressure: Raw pressure value (0 to MAX_PRESSURE)
+            
+        Returns:
+            Pressure as percentage (0-100%)
+        """
+        percent = (pressure / self.MAX_PRESSURE) * 100.0
+        return min(100.0, max(0.0, percent))
+    
+    def classify(self, pressure: int) -> str:
+        """
+        Classify pressure reading into a severity level.
+        
+        Args:
+            pressure: Raw pressure value
+            
+        Returns:
+            Classification level string
+        """
+        percent = self.pressure_to_percent(pressure)
+        
+        if percent < self.THRESHOLDS['NONE'][1]:
+            return self.LEVEL_NONE
+        elif percent < self.THRESHOLDS['LIGHT'][1]:
+            return self.LEVEL_LIGHT
+        elif percent < self.THRESHOLDS['MODERATE'][1]:
+            return self.LEVEL_MODERATE
+        elif percent < self.THRESHOLDS['HIGH'][1]:
+            return self.LEVEL_HIGH
+        else:
+            return self.LEVEL_CRITICAL
+    
+    def get_classification_details(self, pressure: int) -> dict:
+        """
+        Get full classification details for a pressure reading.
+        
+        Args:
+            pressure: Raw pressure value
+            
+        Returns:
+            Dictionary with percent and level
+        """
+        percent = self.pressure_to_percent(pressure)
+        level = self.classify(pressure)
+        
+        return {
+            'percent': round(percent, 2),
+            'level': level
+        }
+
+
 class FilePiezoSensor:
     """
     Mock piezo sensor that reads data from a CSV file.
     Useful for testing and development without hardware.
+    
+    The CSV file should contain: timestamp, pressure
+    Classification is computed by the PressureClassifier model.
     
     Usage:
         sensor = FilePiezoSensor('data/sample_sensor_data.csv')
@@ -45,7 +136,7 @@ class FilePiezoSensor:
         Initialize the file-based sensor reader.
         
         Args:
-            filepath: Path to CSV file with sensor data
+            filepath: Path to CSV file with sensor data (timestamp, pressure)
             playback_speed: Speed multiplier (1.0 = real-time, 2.0 = 2x speed)
             loop: Whether to loop back to start when file ends
             history_size: Number of readings to keep in history
@@ -54,6 +145,9 @@ class FilePiezoSensor:
         self.playback_speed = playback_speed
         self.loop = loop
         self.history_size = history_size
+        
+        # Initialize classifier model
+        self._classifier = PressureClassifier()
         
         self._data: list[dict] = []
         self._current_index = 0
@@ -69,6 +163,10 @@ class FilePiezoSensor:
         """
         Load the CSV file and prepare for reading.
         
+        CSV format: timestamp, pressure
+        - timestamp: milliseconds since start
+        - pressure: raw pressure value (0-511)
+        
         Returns:
             True if file loaded successfully
         """
@@ -80,13 +178,13 @@ class FilePiezoSensor:
         with open(self.filepath, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
+                # Read only timestamp and pressure from CSV
+                timestamp = int(row['timestamp'])
+                pressure = int(row['pressure'])
+                
                 self._data.append({
-                    'timestamp': int(row['timestamp']),
-                    'raw': int(row['raw']),
-                    'filtered': int(row['filtered']),
-                    'pressure': int(row['pressure']),
-                    'percent': float(row['percent']),
-                    'level': row['level']
+                    'timestamp': timestamp,
+                    'pressure': pressure
                 })
         
         if not self._data:
@@ -104,13 +202,25 @@ class FilePiezoSensor:
         print("File sensor disconnected")
     
     def _create_reading(self, data: dict) -> PressureReading:
-        """Create a PressureReading from CSV data."""
+        """
+        Create a PressureReading from CSV data.
+        Uses the classifier model to determine level and percent.
+        """
+        pressure = data['pressure']
+        
+        # Use classifier model to compute level and percent
+        classification = self._classifier.get_classification_details(pressure)
+        
+        # Simulate raw and filtered values (in real hardware these would differ)
+        raw_value = self._baseline + pressure
+        filtered_value = raw_value  # In simulation, filtered = raw
+        
         return PressureReading(
-            raw=data['raw'],
-            filtered=data['filtered'],
-            pressure=data['pressure'],
-            percent=data['percent'],
-            level=data['level'],
+            raw=raw_value,
+            filtered=filtered_value,
+            pressure=pressure,
+            percent=classification['percent'],
+            level=classification['level'],
             timestamp=data['timestamp'],
             received_at=time.time()
         )

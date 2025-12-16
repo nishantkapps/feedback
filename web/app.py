@@ -1,13 +1,16 @@
 """
 Web Dashboard for Piezo Sensor Feedback System
-Displays real-time pressure readings with visual feedback and descriptions.
+Displays real-time pressure readings with visual feedback and recommendations.
 """
 
-import csv
+import sys
 import json
 import time
+import signal
+import atexit
 import threading
 from pathlib import Path
+
 from flask import Flask, render_template, jsonify, Response
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
@@ -18,23 +21,68 @@ current_index = 0
 is_playing = False
 playback_speed = 1.0
 data_lock = threading.Lock()
+shutdown_event = threading.Event()
+stream_thread = None
+
+
+def cleanup():
+    """Cleanup resources on shutdown."""
+    global is_playing, stream_thread
+    print("\nCleaning up resources...")
+    
+    is_playing = False
+    shutdown_event.set()
+    
+    if stream_thread and stream_thread.is_alive():
+        stream_thread.join(timeout=2)
+    
+    print("Cleanup complete.")
+
+
+# Register cleanup handlers
+atexit.register(cleanup)
+
+
+def signal_handler(signum, frame):
+    """Handle termination signals."""
+    print(f"\nReceived signal {signum}, shutting down...")
+    cleanup()
+    sys.exit(0)
+
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 def load_sensor_data(filepath: str):
     """Load sensor data from CSV file."""
     global sensor_data
+    
+    # Import here to avoid circular imports
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from sensors.file_reader import PressureClassifier
+    
+    classifier = PressureClassifier()
     data = []
     
+    import csv
     with open(filepath, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            timestamp = int(row['timestamp'])
+            pressure = int(row['pressure'])
+            
+            # Use classifier to compute level and percent
+            classification = classifier.get_classification_details(pressure)
+            
             data.append({
-                'timestamp': int(row['timestamp']),
-                'raw': int(row['raw']),
-                'filtered': int(row['filtered']),
-                'pressure': int(row['pressure']),
-                'percent': float(row['percent']),
-                'level': row['level']
+                'timestamp': timestamp,
+                'raw': 512 + pressure,  # Simulated raw value
+                'filtered': 512 + pressure,
+                'pressure': pressure,
+                'percent': classification['percent'],
+                'level': classification['level']
             })
     
     with data_lock:
@@ -128,7 +176,7 @@ def stream_data():
         with data_lock:
             total = len(sensor_data)
         
-        while index < total:
+        while index < total and not shutdown_event.is_set():
             with data_lock:
                 if index < len(sensor_data):
                     reading = sensor_data[index].copy()
@@ -156,21 +204,26 @@ def create_app(data_file: str = None):
 
 
 if __name__ == '__main__':
-    import sys
+    import argparse
     
     # Default data file
-    data_file = Path(__file__).parent.parent / 'data' / 'test_small.csv'
+    data_file = Path(__file__).parent.parent / 'data' / 'sample_sensor_data.csv'
     
-    if len(sys.argv) > 1:
-        data_file = sys.argv[1]
+    parser = argparse.ArgumentParser(description='Piezo Sensor Dashboard')
+    parser.add_argument('data_file', nargs='?', default=str(data_file), help='Path to sensor data CSV')
+    parser.add_argument('--port', '-p', type=int, default=5000, help='Port number')
+    args = parser.parse_args()
     
-    print(f"Loading data from: {data_file}")
-    load_sensor_data(str(data_file))
+    print(f"Loading data from: {args.data_file}")
+    load_sensor_data(args.data_file)
     
     print("\n" + "=" * 50)
     print("  Piezo Sensor Dashboard")
-    print("  Open http://localhost:5000 in your browser")
+    print(f"  Open http://localhost:{args.port} in your browser")
     print("=" * 50 + "\n")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
+    try:
+        # Disable debug mode to avoid duplicate processes
+        app.run(debug=False, host='0.0.0.0', port=args.port)
+    finally:
+        cleanup()

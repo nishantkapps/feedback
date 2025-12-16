@@ -6,7 +6,8 @@ Displays real-time pain analysis with video feed and recommendations.
 import sys
 import json
 import time
-import base64
+import signal
+import atexit
 import threading
 from pathlib import Path
 
@@ -31,6 +32,49 @@ is_running = False
 is_calibrated = False
 history = []
 lock = threading.Lock()
+shutdown_event = threading.Event()
+
+
+def cleanup():
+    """Cleanup resources on shutdown."""
+    global is_running, video_source, detector
+    print("\nCleaning up resources...")
+    
+    is_running = False
+    shutdown_event.set()
+    
+    if video_source:
+        try:
+            video_source.stop()
+            video_source.close()
+        except:
+            pass
+        video_source = None
+    
+    if detector:
+        try:
+            detector.close()
+        except:
+            pass
+        detector = None
+    
+    print("Cleanup complete.")
+
+
+# Register cleanup handlers
+atexit.register(cleanup)
+
+
+def signal_handler(signum, frame):
+    """Handle termination signals."""
+    print(f"\nReceived signal {signum}, shutting down...")
+    cleanup()
+    sys.exit(0)
+
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 def init_detector():
@@ -51,6 +95,9 @@ def get_reading_dict(reading: PainReading) -> dict:
 def process_frame(frame: np.ndarray, calibrate: bool = False) -> tuple:
     """Process a frame and return reading + annotated frame."""
     global current_reading, is_calibrated, history
+    
+    if not is_running or shutdown_event.is_set():
+        return None, frame
     
     reading = detector.analyze_frame(frame, calibrate_baseline=calibrate)
     
@@ -122,26 +169,59 @@ def generate_video_feed():
     """Generate video frames for streaming."""
     global is_running, video_source
     
-    while is_running and video_source and video_source.is_open:
-        frame_info = video_source.read_frame()
-        
-        if frame_info is None:
-            if not video_source.is_camera:
-                # Video file ended
-                is_running = False
+    while is_running and not shutdown_event.is_set():
+        if not video_source or not video_source.is_open:
             break
-        
-        _, annotated = process_frame(frame_info.frame)
-        
-        # Encode frame as JPEG
-        _, buffer = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        frame_bytes = buffer.tobytes()
-        
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        
-        # Rate limit
-        time.sleep(1/30)
+            
+        try:
+            frame_info = video_source.read_frame()
+            
+            if frame_info is None:
+                if video_source and not video_source.is_camera:
+                    # Video file ended
+                    break
+                continue
+            
+            _, annotated = process_frame(frame_info.frame)
+            
+            if annotated is None:
+                break
+            
+            # Encode frame as JPEG
+            _, buffer = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            frame_bytes = buffer.tobytes()
+            
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            
+            # Rate limit
+            time.sleep(1/30)
+            
+        except GeneratorExit:
+            # Client disconnected
+            print("Client disconnected from video feed")
+            break
+        except Exception as e:
+            print(f"Error in video feed: {e}")
+            break
+    
+    # Cleanup when stream ends
+    stop_analysis_internal()
+
+
+def stop_analysis_internal():
+    """Internal function to stop analysis."""
+    global is_running, video_source
+    
+    is_running = False
+    
+    if video_source:
+        try:
+            video_source.stop()
+            video_source.close()
+        except:
+            pass
+        video_source = None
 
 
 @app.route('/')
@@ -164,6 +244,7 @@ def start_analysis():
     youtube_url = data.get('youtube_url')
     
     init_detector()
+    shutdown_event.clear()
     
     try:
         if source_type == 'camera':
@@ -202,14 +283,7 @@ def start_analysis():
 @app.route('/api/stop', methods=['POST'])
 def stop_analysis():
     """Stop video analysis."""
-    global is_running, video_source
-    
-    is_running = False
-    if video_source:
-        video_source.stop()
-        video_source.close()
-        video_source = None
-    
+    stop_analysis_internal()
     return jsonify({'status': 'stopped'})
 
 
@@ -225,7 +299,7 @@ def calibrate():
     frame_info = video_source.read_frame()
     if frame_info:
         reading, _ = process_frame(frame_info.frame, calibrate=True)
-        if reading.face_detected:
+        if reading and reading.face_detected:
             return jsonify({'status': 'calibrated', 'message': 'Baseline set from neutral expression'})
         else:
             return jsonify({'error': 'No face detected for calibration'}), 400
@@ -300,5 +374,8 @@ if __name__ == '__main__':
     else:
         print("Using webcam (default)")
     
-    app.run(debug=True, host='0.0.0.0', port=args.port, threaded=True)
-
+    try:
+        # Disable debug mode to avoid duplicate processes
+        app.run(debug=False, host='0.0.0.0', port=args.port, threaded=True)
+    finally:
+        cleanup()
