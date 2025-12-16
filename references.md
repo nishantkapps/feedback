@@ -4,6 +4,151 @@ This document lists all external models, libraries, and data sources used in the
 
 ---
 
+## Piezo Sensor Module
+
+### 1. Arduino Platform
+
+**Purpose:** Microcontroller for reading analog sensor data
+
+**Hardware:**
+| Component | Description |
+|-----------|-------------|
+| Arduino Uno/Nano | ATmega328P microcontroller board |
+| Piezo Sensor/Disc | Piezoelectric transducer for pressure detection |
+| 1MΩ Resistor | Parallel resistor for signal stability |
+
+**Arduino IDE:** https://www.arduino.cc/en/software
+
+**License:** LGPL (Arduino core libraries)
+
+---
+
+### 2. Piezoelectric Sensor Theory
+
+**Purpose:** Convert mechanical pressure/vibration to electrical signal
+
+**How it works:**
+- Piezoelectric materials generate voltage when mechanically stressed
+- The voltage is proportional to the applied force/pressure
+- Arduino reads this as an analog value (0-1023 for 10-bit ADC)
+
+**Sensor Specifications (typical):**
+| Parameter | Value |
+|-----------|-------|
+| Output Type | Analog voltage |
+| Sensitivity | ~50mV/N (varies by sensor) |
+| Response Time | < 1ms |
+| Operating Voltage | 0-5V (Arduino compatible) |
+
+**References:**
+1. "Piezoelectric Sensors" - PCB Piezotronics: https://www.pcb.com/resources/technical-information/introduction-to-piezoelectric-sensors
+
+2. Arduino Analog Input Documentation: https://www.arduino.cc/reference/en/language/functions/analog-io/analogread/
+
+---
+
+### 3. Signal Processing
+
+**Moving Average Filter:**
+```cpp
+// Smooths noisy sensor readings
+filtered_value = (sum of last N readings) / N
+```
+
+**Baseline Calibration:**
+- Samples sensor at rest to establish baseline
+- Pressure calculated as: `current_reading - baseline`
+
+**Reference:**
+- "Digital Signal Processing" - Smith, S.W.: http://www.dspguide.com/
+
+---
+
+### 4. Serial Communication Protocol
+
+**Purpose:** Transmit sensor data from Arduino to Python
+
+**Protocol Details:**
+| Parameter | Value |
+|-----------|-------|
+| Baud Rate | 115200 |
+| Data Format | JSON |
+| Encoding | UTF-8 |
+
+**Message Format:**
+```json
+{
+  "raw": 512,
+  "filtered": 515,
+  "pressure": 3,
+  "percent": 0.29,
+  "level": "NONE",
+  "timestamp": 1234567
+}
+```
+
+**Library:** PySerial
+- PyPI: https://pypi.org/project/pyserial/
+- Documentation: https://pyserial.readthedocs.io/
+- License: BSD-3-Clause
+
+---
+
+### 5. Pressure Level Classification
+
+**Threshold-based Classification:**
+
+| Level | Threshold | Response |
+|-------|-----------|----------|
+| NONE | 0-5% | Normal operation |
+| LIGHT | 5-20% | Monitor |
+| MODERATE | 20-50% | Reduce speed |
+| HIGH | 50-80% | Pause operation |
+| CRITICAL | 80-100% | Emergency stop |
+
+**Reference:**
+- Based on tactile feedback research for human-robot interaction safety
+- ISO 10218-1:2011 - Robots and robotic devices — Safety requirements
+
+---
+
+### 6. Arduino Sketch Components
+
+**File:** `arduino/piezo_sensor/piezo_sensor.ino`
+
+| Function | Purpose |
+|----------|---------|
+| `analogRead()` | Read piezo sensor voltage |
+| `Serial.print()` | Transmit data to computer |
+| `applyFilter()` | Moving average smoothing |
+| `calibrateBaseline()` | Set reference point |
+| `getPressureLevel()` | Classify pressure category |
+
+**Arduino Language Reference:** https://www.arduino.cc/reference/en/
+
+---
+
+### 7. Wiring Diagram Reference
+
+```
+Piezo Sensor          Arduino
+------------          -------
+  (+) ──────────────── A0 (Analog Pin)
+  (-) ──────────────── GND
+
+  [1MΩ resistor in parallel across piezo terminals]
+```
+
+**Why 1MΩ resistor?**
+- Provides a discharge path for the piezo's generated charge
+- Prevents voltage drift and signal instability
+- Acts as a load resistor for proper voltage reading
+
+**Reference:**
+- "Using a Piezo Element" - Arduino Tutorial: https://www.arduino.cc/en/Tutorial/BuiltInExamples/Knock
+
+---
+
 ## Face Pain Detection Module
 
 ### 1. OpenCV DNN Face Detector
@@ -170,6 +315,8 @@ The sample CSV files in `data/` are **synthetically generated** for testing purp
 
 ## Acknowledgments
 
+- **Arduino Team** - For the open-source microcontroller platform
+- **PySerial Maintainers** - For Python serial communication library
 - **OpenCV Team** - For the DNN face detector and computer vision tools
 - **Kurnianggoro** - For the LBF facial landmark model (GSOC 2017)
 - **yt-dlp Contributors** - For YouTube video extraction
