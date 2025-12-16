@@ -1,0 +1,10 @@
+# Robotic Arm Feedback System Dependencies
+
+# Serial communication with Arduino
+pyserial>=3.5
+
+# Future dependencies (commented out for now):
+# opencv-python>=4.8.0  # Camera feedback for facial detection
+# numpy>=1.24.0         # Numerical operations
+# mediapipe>=0.10.0     # Facial landmark detection
+
