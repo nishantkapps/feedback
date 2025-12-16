@@ -1,12 +1,12 @@
 {
-  "pain_level": 1,
-  "pain_level_name": "MILD",
-  "pain_score": 29.100254755999195,
-  "speed_modifier": 0.7271979619520065,
-  "amplitude_modifier": 0.8180977071960073,
-  "force_modifier": 0.7726478345740069,
+  "pain_level": 2,
+  "pain_level_name": "MODERATE",
+  "pain_score": 31.07856171509425,
+  "speed_modifier": 0.44460719142452876,
+  "amplitude_modifier": 0.6224500679943402,
+  "force_modifier": 0.5335286297094345,
   "should_pause": false,
   "should_stop": false,
   "confidence": 0.9,
-  "timestamp": 1765887574.920835
+  "timestamp": 1765887604.4350526
 }
