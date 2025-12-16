@@ -1,0 +1,12 @@
+{
+  "speed_override": 50,
+  "motion_scale": 70,
+  "force_limit": 60,
+  "external_pause": false,
+  "external_stop": false,
+  "enable_motion": true,
+  "timestamp": 1765888924.6385393,
+  "source": "pain_feedback",
+  "confidence": 0.85,
+  "pain_level": 2
+}
