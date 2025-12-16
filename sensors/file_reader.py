@@ -59,6 +59,7 @@ class FilePiezoSensor:
         self._current_index = 0
         self._reading_thread: Optional[threading.Thread] = None
         self._stop_flag = threading.Event()
+        self._finished_flag = threading.Event()  # Signals when playback is done
         self._history: deque = deque(maxlen=history_size)
         self._callbacks: list[Callable[[PressureReading], None]] = []
         self._is_connected = False
@@ -154,6 +155,7 @@ class FilePiezoSensor:
         
         self._current_index = 0
         self._stop_flag.clear()
+        self._finished_flag.clear()
         self._reading_thread = threading.Thread(target=self._reading_loop, daemon=True)
         self._reading_thread.start()
         print(f"Started playback at {self.playback_speed}x speed")
@@ -179,6 +181,7 @@ class FilePiezoSensor:
             if reading is None:
                 if not self.loop:
                     print("\nEnd of data file reached")
+                    self._finished_flag.set()
                     break
                 continue
             
@@ -199,6 +202,8 @@ class FilePiezoSensor:
                     callback(reading)
                 except Exception as e:
                     print(f"Callback error: {e}")
+        
+        self._finished_flag.set()
     
     def add_callback(self, callback: Callable[[PressureReading], None]):
         """Add a callback for readings."""
@@ -239,6 +244,11 @@ class FilePiezoSensor:
     def is_connected(self) -> bool:
         """Check if connected (file loaded)."""
         return self._is_connected
+    
+    @property
+    def is_finished(self) -> bool:
+        """Check if playback has finished (only relevant when loop=False)."""
+        return self._finished_flag.is_set()
     
     @property
     def baseline(self) -> int:

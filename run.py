@@ -199,10 +199,14 @@ def _run_sensor_loop(sensor):
     
     try:
         while True:
+            # Check if file-based sensor has finished (non-looping mode)
+            if hasattr(sensor, 'is_finished') and sensor.is_finished:
+                print(f"\n\n{Colors.GREEN}Playback complete!{Colors.RESET}")
+                break
             time.sleep(0.1)
     except KeyboardInterrupt:
         print(f"\n\n{Colors.YELLOW}Stopping...{Colors.RESET}")
-        return True
+    return True
 
 
 def main():
