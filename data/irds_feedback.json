@@ -1,12 +1,12 @@
 {
   "pain_level": 0,
   "pain_level_name": "NONE",
-  "pain_score": 0,
-  "speed_modifier": 1.0,
-  "amplitude_modifier": 1.0,
-  "force_modifier": 1.0,
+  "pain_score": 4.236355990499659,
+  "speed_modifier": 0.9576364400950034,
+  "amplitude_modifier": 0.9576364400950034,
+  "force_modifier": 0.9576364400950034,
   "should_pause": false,
   "should_stop": false,
-  "confidence": 0.0,
-  "timestamp": 1765890327.937317
+  "confidence": 0.9,
+  "timestamp": 1765892093.4991941
 }
